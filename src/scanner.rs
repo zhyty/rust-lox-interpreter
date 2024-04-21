@@ -80,23 +80,38 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenKind::LESS);
                 }
             }
+            ">" => {
+                if self.advance_if_next_matches("=") {
+                    self.add_token(TokenKind::GREATER_EQUAL);
+                } else {
+                    self.add_token(TokenKind::GREATER);
+                }
+            }
             "/" => {
                 if self.advance_if_next_matches("/") {
                     // Comment
                     while let Some(grapheme) = self.peek() {
-                        if !is_newline(grapheme) {
-                            // Note: learning Rust, no problem getting a `&mut
-                            // self` here because `grapheme`'s lifetime ends
-                            // before it.
-                            self.advance();
-                            // grapheme; // uncommenting this line causes a
-                            // double &mut borrow error.
+                        if is_newline(grapheme) {
+                            break;
                         }
-                    };
+                        // Note: learning Rust, no problem getting a `&mut
+                        // self` here because `grapheme`'s lifetime ends
+                        // before it.
+                        self.advance();
+                        // grapheme; // uncommenting this line causes a
+                        // double &mut borrow error.
+                    }
                 } else {
                     // Division
                     self.add_token(TokenKind::SLASH);
                 }
+            }
+            // Must precede whitespace check since newlines are also whitespace.
+            _ if is_newline(grapheme) => {
+                self.line_number += 1;
+            }
+            _ if is_whitespace(grapheme) => {
+                // continue
             }
             _ => {
                 self.report_error(self.line_number, "Unexpected character.");
@@ -122,7 +137,9 @@ impl<'a> Scanner<'a> {
     }
 
     fn advance_if_next_matches(&mut self, to_match: &str) -> bool {
-        let matches = self.peek().map_or(false, |next_grapheme| next_grapheme == to_match);
+        let matches = self
+            .peek()
+            .map_or(false, |next_grapheme| next_grapheme == to_match);
         if matches {
             self.advance();
         }
@@ -226,4 +243,9 @@ impl<'a> ToString for Token<'a> {
 fn is_newline(grapheme: &str) -> bool {
     // Note: can add support for other types of newlines later.
     grapheme == "\n"
+}
+
+// Including newline!
+fn is_whitespace(grapheme: &str) -> bool {
+    grapheme.chars().all(char::is_whitespace)
 }

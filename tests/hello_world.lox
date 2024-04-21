@@ -1,0 +1,8 @@
+// this is a comment
+(( )){} // grouping stuff
+!*+-/=<> <= == // operators
+
+// First program
+// print "Hello world!";
+// true;
+// 12.34;
