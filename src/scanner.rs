@@ -106,7 +106,15 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenKind::SLASH);
                 }
             }
+            "\"" => {
+                // Note: we're differing from the textbook by including the
+                // quotation marks. We could always trim them in `add_token`.
+                self.advance_string();
+                self.add_token(TokenKind::STRING);
+            }
             // Must precede whitespace check since newlines are also whitespace.
+            // Note: maybe we can move the line number counting logic into
+            // advance?
             _ if is_newline(grapheme) => {
                 self.line_number += 1;
             }
@@ -137,9 +145,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn advance_if_next_matches(&mut self, to_match: &str) -> bool {
-        let matches = self
-            .peek()
-            .map_or(false, |next_grapheme| next_grapheme == to_match);
+        let matches = self.peek() == Some(to_match);
         if matches {
             self.advance();
         }
@@ -152,6 +158,32 @@ impl<'a> Scanner<'a> {
             lexeme: &self.source[self.token_start_byte_offset..self.current_byte_offset],
             line_number: self.line_number,
         });
+    }
+
+    fn advance_string(&mut self) -> bool {
+        while let Some(grapheme) = self.peek() {
+            if grapheme == "\"" {
+                break;
+            }
+
+            // We allow multiline strings as well, so watch out for line number
+            // changes.
+            if is_newline(grapheme) {
+                self.line_number += 1;
+            }
+
+            self.advance();
+        }
+
+        // Give up on string if we don't see a terminating quote.
+        if self.peek().is_none() {
+            self.report_error(self.line_number, "Unterminated string");
+            return false;
+        }
+        // Past the closing quotation mark.
+        self.advance();
+
+        true
     }
 
     fn report_error(&mut self, line: usize, message: &str) {

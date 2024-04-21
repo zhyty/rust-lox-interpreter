@@ -1,6 +1,10 @@
 // this is a comment
 (( )){} // grouping stuff
 !*+-/=<> <= == // operators
+"Hello!"
+"Multiline 
+string"
+// TODO: test termination
 
 // First program
 // print "Hello world!";
