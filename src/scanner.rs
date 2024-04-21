@@ -127,6 +127,11 @@ impl<'a> Scanner<'a> {
                 self.advance_number();
                 self.add_token(TokenKind::NUMBER);
             }
+            _ if is_identifier_head(grapheme) => {
+                self.advance_identifier();
+                // TODO: check if identifier is keyword
+                self.add_token(TokenKind::IDENTIFIER);
+            }
             _ => {
                 self.report_error(self.line_number, "Unexpected character.");
                 // Continue trying to lex/scan...
@@ -139,12 +144,6 @@ impl<'a> Scanner<'a> {
         true
     }
 
-    fn advance(&mut self) -> Option<&str> {
-        let (byte_offset, grapheme) = self.graphemes_iter.next()?;
-        self.current_byte_offset = byte_offset + grapheme.len();
-        Some(grapheme)
-    }
-
     fn peek(&mut self) -> Option<&str> {
         let (_, grapheme) = self.graphemes_iter.peek()?;
         Some(grapheme)
@@ -155,6 +154,12 @@ impl<'a> Scanner<'a> {
         // We want to early return if it's null, since our iterator interface should signal EOF when None.
         iter_clone.next()?;
         let (_, grapheme) = iter_clone.next()?;
+        Some(grapheme)
+    }
+
+    fn advance(&mut self) -> Option<&str> {
+        let (byte_offset, grapheme) = self.graphemes_iter.next()?;
+        self.current_byte_offset = byte_offset + grapheme.len();
         Some(grapheme)
     }
 
@@ -225,6 +230,15 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    fn advance_identifier(&mut self) {
+        while let Some(grapheme) = self.peek() {
+            if !is_identifier_tail(grapheme) {
+                break;
+            }
+            self.advance();
+        }
+    }
+
     fn add_token(&mut self, kind: TokenKind) {
         self.tokens.push(Token {
             kind,
@@ -251,6 +265,7 @@ impl<'a> std::fmt::Debug for Scanner<'a> {
     }
 }
 
+// TODO: some lexemes have different types... Maybe we should refactor this.
 #[derive(Debug)]
 pub enum TokenKind {
     // Single-character tokens.
@@ -331,9 +346,24 @@ fn is_whitespace(grapheme: &str) -> bool {
 
 // Digits are just restricted to 0-9.
 fn is_digit(grapheme: &str) -> bool {
+    // Note: not too sure this first check is necessary, but just in case there
+    // are multiple codepoints in the grapheme, or some larger codepoint.
     grapheme.chars().count() == 1
         && grapheme
             .chars()
             .next()
             .map_or(false, |ch| char::is_digit(ch, 10))
+}
+
+// Lox accepts alphabetic (unicode) and underscore as the first grapheme of an
+// identifier.
+fn is_identifier_head(grapheme: &str) -> bool {
+    grapheme.chars().all(|ch| char::is_alphabetic(ch) || ch == '_')
+}
+
+// Lox accepts alphanumeric (unicode) and underscore after the first grapheme. I
+// could have restricted the numbers similar to `is_digit`, but why not expand
+// it.
+fn is_identifier_tail(grapheme: &str) -> bool {
+    grapheme.chars().all(|ch| char::is_alphanumeric(ch) || ch == '_')
 }

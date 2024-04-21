@@ -9,4 +9,8 @@ string"
 123123.456
 123123.
 
+some _valid _identifiers123_
+
+123number_then_identifier
+
 "Unterminated string
