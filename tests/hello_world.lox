@@ -4,9 +4,9 @@
 "Hello!"
 "Multiline 
 string"
-// TODO: test termination
 
-// First program
-// print "Hello world!";
-// true;
-// 12.34;
+123123
+123123.456
+123123.
+
+"Unterminated string

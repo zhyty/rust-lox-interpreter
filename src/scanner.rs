@@ -109,8 +109,9 @@ impl<'a> Scanner<'a> {
             "\"" => {
                 // Note: we're differing from the textbook by including the
                 // quotation marks. We could always trim them in `add_token`.
-                self.advance_string();
-                self.add_token(TokenKind::STRING);
+                if self.advance_string() {
+                    self.add_token(TokenKind::STRING);
+                }
             }
             // Must precede whitespace check since newlines are also whitespace.
             // Note: maybe we can move the line number counting logic into
@@ -120,6 +121,11 @@ impl<'a> Scanner<'a> {
             }
             _ if is_whitespace(grapheme) => {
                 // continue
+            }
+            // Lox just understands ASCII 0-9
+            _ if is_digit(grapheme) => {
+                self.advance_number();
+                self.add_token(TokenKind::NUMBER);
             }
             _ => {
                 self.report_error(self.line_number, "Unexpected character.");
@@ -144,20 +150,20 @@ impl<'a> Scanner<'a> {
         Some(grapheme)
     }
 
+    fn double_peek(&mut self) -> Option<&str> {
+        let mut iter_clone = self.graphemes_iter.clone();
+        // We want to early return if it's null, since our iterator interface should signal EOF when None.
+        iter_clone.next()?;
+        let (_, grapheme) = iter_clone.next()?;
+        Some(grapheme)
+    }
+
     fn advance_if_next_matches(&mut self, to_match: &str) -> bool {
         let matches = self.peek() == Some(to_match);
         if matches {
             self.advance();
         }
         matches
-    }
-
-    fn add_token(&mut self, kind: TokenKind) {
-        self.tokens.push(Token {
-            kind,
-            lexeme: &self.source[self.token_start_byte_offset..self.current_byte_offset],
-            line_number: self.line_number,
-        });
     }
 
     fn advance_string(&mut self) -> bool {
@@ -184,6 +190,47 @@ impl<'a> Scanner<'a> {
         self.advance();
 
         true
+    }
+
+    // Note: doesn't return bool since it can't really fail.
+    fn advance_number(&mut self) {
+        while let Some(grapheme) = self.peek() {
+            if !is_digit(grapheme) {
+                break;
+            }
+            self.advance();
+        }
+
+        // Not a number anymore, but could be a decimal point. If decimal point
+        // is followed by a number, we continue processing the number.
+        // Otherwise, it could be a function call (DOT).
+
+        // Note: what if we treated the decimal "." as DOT as well? And worried
+        // about number/function call during parsing? I guess we would have to
+        // worry about operator precedence then... and "NUMBER . FUNCTION .
+        // NUMBER" could be a weird case.
+        if self.peek() == Some(".") {
+            if let Some(grapheme_after_dot) = self.double_peek() {
+                if is_digit(grapheme_after_dot) {
+                    self.advance();
+
+                    while let Some(grapheme) = self.peek() {
+                        if !is_digit(grapheme) {
+                            break;
+                        }
+                        self.advance();
+                    }
+                }
+            }
+        }
+    }
+
+    fn add_token(&mut self, kind: TokenKind) {
+        self.tokens.push(Token {
+            kind,
+            lexeme: &self.source[self.token_start_byte_offset..self.current_byte_offset],
+            line_number: self.line_number,
+        });
     }
 
     fn report_error(&mut self, line: usize, message: &str) {
@@ -280,4 +327,13 @@ fn is_newline(grapheme: &str) -> bool {
 // Including newline!
 fn is_whitespace(grapheme: &str) -> bool {
     grapheme.chars().all(char::is_whitespace)
+}
+
+// Digits are just restricted to 0-9.
+fn is_digit(grapheme: &str) -> bool {
+    grapheme.chars().count() == 1
+        && grapheme
+            .chars()
+            .next()
+            .map_or(false, |ch| char::is_digit(ch, 10))
 }
