@@ -1,9 +1,14 @@
+use anyhow::bail;
 use clap::Parser;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+
+use crate::scanner::Scanner;
+
+mod scanner;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -14,7 +19,9 @@ struct Args {
 
 #[derive(Debug)]
 struct Lox {
-    // TODO: some state
+    // NOTE: might be better if Lox initialized with some strategy for error
+    // handling.
+    has_error: bool,
 }
 
 impl Lox {
@@ -27,6 +34,10 @@ impl Lox {
         let mut lox = Lox::new();
         lox.run(&contents);
 
+        if lox.has_error() {
+            bail!("TODO: some error msg");
+        }
+
         Ok(())
     }
 
@@ -38,15 +49,32 @@ impl Lox {
             lox.run(&line);
         }
 
+        if lox.has_error() {
+            bail!("TODO: some error msg");
+        }
+
         Ok(())
     }
 
     pub fn new() -> Self {
-        Self {}
+        Self { has_error: false }
     }
 
     pub fn run(&mut self, code: &str) {
-        unimplemented!()
+        let mut scanner = Scanner::new(code);
+        let tokens = scanner.scan_tokens();
+        println!("Tokens:");
+        println!("{:#?}", tokens);
+        // TODO:
+    }
+
+    pub fn has_error(&self) -> bool {
+        self.has_error
+    }
+
+    fn report_error(&mut self, line: u64, message: &str) {
+        eprintln!("[line {}] Error (TODO where): {}", line, message);
+        self.has_error = true;
     }
 }
 
@@ -59,7 +87,7 @@ fn main() -> anyhow::Result<()> {
         None => {
             Lox::run_repl()?;
         }
-    }
+    };
 
-    return Ok(());
+    Ok(())
 }
