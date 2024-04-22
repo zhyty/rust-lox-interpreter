@@ -272,7 +272,7 @@ impl<'a> Scanner<'a> {
         let quoted_str = &self.source[self.token_start_byte_offset..self.current_byte_offset];
         self.tokens.push(AnnotatedToken {
             token: Token::String { quoted_str },
-            line_number: self.line_number
+            line_number: self.line_number,
         });
     }
 
@@ -345,7 +345,7 @@ pub enum Token<'a> {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct AnnotatedToken<'a> {
     pub token: Token<'a>,
     pub line_number: usize,
@@ -414,5 +414,187 @@ fn token_from_identifier(identifier: &str) -> Token {
         "var" => Token::Var,
         "while" => Token::While,
         _ => Token::Identifier { identifier },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_scan() {
+        let source = r#"
+// this is a comment
+(( )){} // grouping stuff
+!*+-/=<> <= == // operators
+"Hello!"
+"Multiline 
+string"
+
+123123
+123123.456
+123123.
+
+some _valid _identifiers123_
+
+123number_then_identifier
+
+var var_is_a_keyword and true;
+
+"Unterminated string
+"#;
+        let mut scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        assert_eq!(
+            *tokens,
+            [
+                AnnotatedToken {
+                    token: Token::LeftParen,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::LeftParen,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::RightParen,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::RightParen,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::LeftBrace,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::RightBrace,
+                    line_number: 3,
+                },
+                AnnotatedToken {
+                    token: Token::Bang,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Star,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Plus,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Minus,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Slash,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Equal,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Less,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::Greater,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::LessEqual,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::EqualEqual,
+                    line_number: 4,
+                },
+                AnnotatedToken {
+                    token: Token::String {
+                        quoted_str: "\"Hello!\"",
+                    },
+                    line_number: 5,
+                },
+                AnnotatedToken {
+                    token: Token::String {
+                        quoted_str: "\"Multiline \nstring\"",
+                    },
+                    line_number: 7,
+                },
+                AnnotatedToken {
+                    token: Token::Number { number: 123123.0 },
+                    line_number: 9,
+                },
+                AnnotatedToken {
+                    token: Token::Number { number: 123123.456 },
+                    line_number: 10,
+                },
+                AnnotatedToken {
+                    token: Token::Number { number: 123123.0 },
+                    line_number: 11,
+                },
+                AnnotatedToken {
+                    token: Token::Dot,
+                    line_number: 11,
+                },
+                AnnotatedToken {
+                    token: Token::Identifier { identifier: "some" },
+                    line_number: 13,
+                },
+                AnnotatedToken {
+                    token: Token::Identifier {
+                        identifier: "_valid",
+                    },
+                    line_number: 13,
+                },
+                AnnotatedToken {
+                    token: Token::Identifier {
+                        identifier: "_identifiers123_",
+                    },
+                    line_number: 13,
+                },
+                AnnotatedToken {
+                    token: Token::Number { number: 123.0 },
+                    line_number: 15,
+                },
+                AnnotatedToken {
+                    token: Token::Identifier {
+                        identifier: "number_then_identifier",
+                    },
+                    line_number: 15,
+                },
+                AnnotatedToken {
+                    token: Token::Var,
+                    line_number: 17,
+                },
+                AnnotatedToken {
+                    token: Token::Identifier {
+                        identifier: "var_is_a_keyword",
+                    },
+                    line_number: 17,
+                },
+                AnnotatedToken {
+                    token: Token::And,
+                    line_number: 17,
+                },
+                AnnotatedToken {
+                    token: Token::True,
+                    line_number: 17,
+                },
+                AnnotatedToken {
+                    token: Token::Semicolon,
+                    line_number: 17,
+                },
+                AnnotatedToken {
+                    token: Token::EOF,
+                    line_number: 20,
+                },
+            ]
+        );
+
+        assert!(scanner.has_error());
     }
 }
