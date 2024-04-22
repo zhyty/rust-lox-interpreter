@@ -11,7 +11,7 @@ pub struct Scanner<'a> {
     current_byte_offset: usize,
 
     line_number: usize,
-    tokens: Vec<Token<'a>>,
+    tokens: Vec<AnnotatedToken<'a>>,
     // TODO: this has_error stuff is duplicated in Lox. Maybe have a reference
     // to Lox somehow?
     has_error: bool,
@@ -33,9 +33,9 @@ impl<'a> Scanner<'a> {
     }
 
     // NOTE: maybe this should consume self?
-    pub fn scan_tokens(&mut self) -> &Vec<Token<'a>> {
+    pub fn scan_tokens(&mut self) -> &Vec<AnnotatedToken<'a>> {
         while self.scan_token() {}
-        self.add_token(TokenKind::EOF);
+        self.add_token(Token::EOF);
         &self.tokens
     }
 
@@ -50,42 +50,42 @@ impl<'a> Scanner<'a> {
             Some(grapheme) => grapheme,
         };
         match grapheme {
-            "(" => self.add_token(TokenKind::LeftParen),
-            ")" => self.add_token(TokenKind::RightParen),
-            "{" => self.add_token(TokenKind::LeftBrace),
-            "}" => self.add_token(TokenKind::RightBrace),
-            "," => self.add_token(TokenKind::Comma),
-            "." => self.add_token(TokenKind::Dot),
-            "-" => self.add_token(TokenKind::Minus),
-            "+" => self.add_token(TokenKind::Plus),
-            ";" => self.add_token(TokenKind::Semicolon),
-            "*" => self.add_token(TokenKind::Star),
+            "(" => self.add_token(Token::LeftParen),
+            ")" => self.add_token(Token::RightParen),
+            "{" => self.add_token(Token::LeftBrace),
+            "}" => self.add_token(Token::RightBrace),
+            "," => self.add_token(Token::Comma),
+            "." => self.add_token(Token::Dot),
+            "-" => self.add_token(Token::Minus),
+            "+" => self.add_token(Token::Plus),
+            ";" => self.add_token(Token::Semicolon),
+            "*" => self.add_token(Token::Star),
             "!" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::BangEqual);
+                    self.add_token(Token::BangEqual);
                 } else {
-                    self.add_token(TokenKind::Bang);
+                    self.add_token(Token::Bang);
                 };
             }
             "=" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::EqualEqual);
+                    self.add_token(Token::EqualEqual);
                 } else {
-                    self.add_token(TokenKind::Equal);
+                    self.add_token(Token::Equal);
                 }
             }
             "<" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::LessEqual);
+                    self.add_token(Token::LessEqual);
                 } else {
-                    self.add_token(TokenKind::Less);
+                    self.add_token(Token::Less);
                 }
             }
             ">" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::GreaterEqual);
+                    self.add_token(Token::GreaterEqual);
                 } else {
-                    self.add_token(TokenKind::Greater);
+                    self.add_token(Token::Greater);
                 }
             }
             "/" => {
@@ -104,14 +104,14 @@ impl<'a> Scanner<'a> {
                     }
                 } else {
                     // Division
-                    self.add_token(TokenKind::Slash);
+                    self.add_token(Token::Slash);
                 }
             }
             "\"" => {
                 // Note: we're differing from the textbook by including the
                 // quotation marks. We could always trim them in `add_token`.
                 if self.advance_string() {
-                    self.add_token(TokenKind::String);
+                    self.add_string_token();
                 }
             }
             // Must precede whitespace check since newlines are also whitespace.
@@ -126,12 +126,11 @@ impl<'a> Scanner<'a> {
             // Lox just understands ASCII 0-9
             _ if is_digit(grapheme) => {
                 self.advance_number();
-                self.add_token(TokenKind::Number);
+                self.add_number_token();
             }
             _ if is_identifier_head(grapheme) => {
                 self.advance_identifier();
-                // TODO: check if identifier is keyword
-                self.add_token(TokenKind::Identifier);
+                self.add_identifier_token();
             }
             _ => {
                 self.report_error(self.line_number, "Unexpected character.");
@@ -240,15 +239,40 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn add_token(&mut self, mut kind: TokenKind) {
-        let lexeme = &self.source[self.token_start_byte_offset..self.current_byte_offset];
-        if kind == TokenKind::Identifier {
-            kind = identifier_string_to_token_kind(lexeme);
-        }
-        self.tokens.push(Token {
-            kind,
-            lexeme: &self.source[self.token_start_byte_offset..self.current_byte_offset],
+    fn add_token(&mut self, token: Token<'a>) {
+        self.tokens.push(AnnotatedToken {
+            token,
             line_number: self.line_number,
+        })
+    }
+
+    // Trying to pass a token containing a immutable reference while holding a
+    // mutable reference causes some problems for certain tokens.
+    fn add_number_token(&mut self) {
+        let number_lexeme = &self.source[self.token_start_byte_offset..self.current_byte_offset];
+        // TODO: consider replacing unwrap?
+        let number: f64 = number_lexeme.parse().unwrap();
+        self.tokens.push(AnnotatedToken {
+            token: Token::Number { number },
+            line_number: self.line_number,
+        })
+    }
+
+    // See `add_number_token`
+    fn add_identifier_token(&mut self) {
+        let identifier = &self.source[self.token_start_byte_offset..self.current_byte_offset];
+        self.tokens.push(AnnotatedToken {
+            token: token_from_identifier(identifier),
+            line_number: self.line_number,
+        });
+    }
+
+    // See `add_number_token`
+    fn add_string_token(&mut self) {
+        let quoted_str = &self.source[self.token_start_byte_offset..self.current_byte_offset];
+        self.tokens.push(AnnotatedToken {
+            token: Token::String { quoted_str },
+            line_number: self.line_number
         });
     }
 
@@ -270,9 +294,8 @@ impl<'a> std::fmt::Debug for Scanner<'a> {
     }
 }
 
-// TODO: some lexemes have different types... Maybe we should refactor this.
 #[derive(Debug, PartialEq)]
-pub enum TokenKind {
+pub enum Token<'a> {
     // Single-character tokens.
     LeftParen,
     RightParen,
@@ -296,11 +319,6 @@ pub enum TokenKind {
     Less,
     LessEqual,
 
-    // Literals.
-    Identifier,
-    String,
-    Number,
-
     // Keywords.
     And,
     Class,
@@ -319,23 +337,23 @@ pub enum TokenKind {
     Var,
     While,
 
+    // Literals.
+    Identifier { identifier: &'a str },
+    String { quoted_str: &'a str },
+    Number { number: f64 },
+
     EOF,
 }
 
 #[derive(Debug)]
-pub struct Token<'a> {
-    kind: TokenKind,
-    lexeme: &'a str,
-    // literal: ???
-    line_number: usize,
+pub struct AnnotatedToken<'a> {
+    pub token: Token<'a>,
+    pub line_number: usize,
 }
 
-impl<'a> ToString for Token<'a> {
+impl<'a> ToString for AnnotatedToken<'a> {
     fn to_string(&self) -> String {
-        format!(
-            "{:?} {} {} {}",
-            self.kind, self.lexeme, self.line_number, "TODO: literal"
-        )
+        format!("{:?}", self)
     }
 }
 
@@ -363,34 +381,38 @@ fn is_digit(grapheme: &str) -> bool {
 // Lox accepts alphabetic (unicode) and underscore as the first grapheme of an
 // identifier.
 fn is_identifier_head(grapheme: &str) -> bool {
-    grapheme.chars().all(|ch| char::is_alphabetic(ch) || ch == '_')
+    grapheme
+        .chars()
+        .all(|ch| char::is_alphabetic(ch) || ch == '_')
 }
 
 // Lox accepts alphanumeric (unicode) and underscore after the first grapheme. I
 // could have restricted the numbers similar to `is_digit`, but why not expand
 // it.
 fn is_identifier_tail(grapheme: &str) -> bool {
-    grapheme.chars().all(|ch| char::is_alphanumeric(ch) || ch == '_')
+    grapheme
+        .chars()
+        .all(|ch| char::is_alphanumeric(ch) || ch == '_')
 }
 
-fn identifier_string_to_token_kind(identifier: &str) -> TokenKind {
+fn token_from_identifier(identifier: &str) -> Token {
     match identifier {
-        "and" => TokenKind::And,
-        "class" => TokenKind::Class,
-        "else" => TokenKind::Else,
-        "false" => TokenKind::False,
-        "for" => TokenKind::For,
-        "fun" => TokenKind::Fun,
-        "if" => TokenKind::If,
-        "nil" => TokenKind::Nil,
-        "or" => TokenKind::Or,
-        "print" => TokenKind::Print,
-        "return" => TokenKind::Return,
-        "super" => TokenKind::Super,
-        "this" => TokenKind::This,
-        "true" => TokenKind::True,
-        "var" => TokenKind::Var,
-        "while" => TokenKind::While,
-        _ => TokenKind::Identifier,
+        "and" => Token::And,
+        "class" => Token::Class,
+        "else" => Token::Else,
+        "false" => Token::False,
+        "for" => Token::For,
+        "fun" => Token::Fun,
+        "if" => Token::If,
+        "nil" => Token::Nil,
+        "or" => Token::Or,
+        "print" => Token::Print,
+        "return" => Token::Return,
+        "super" => Token::Super,
+        "this" => Token::This,
+        "true" => Token::True,
+        "var" => Token::Var,
+        "while" => Token::While,
+        _ => Token::Identifier { identifier },
     }
 }
