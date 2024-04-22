@@ -35,6 +35,7 @@ impl<'a> Scanner<'a> {
     // NOTE: maybe this should consume self?
     pub fn scan_tokens(&mut self) -> &Vec<Token<'a>> {
         while self.scan_token() {}
+        self.add_token(TokenKind::EOF);
         &self.tokens
     }
 
@@ -49,42 +50,42 @@ impl<'a> Scanner<'a> {
             Some(grapheme) => grapheme,
         };
         match grapheme {
-            "(" => self.add_token(TokenKind::LEFT_PAREN),
-            ")" => self.add_token(TokenKind::RIGHT_PAREN),
-            "{" => self.add_token(TokenKind::LEFT_BRACE),
-            "}" => self.add_token(TokenKind::RIGHT_BRACE),
-            "," => self.add_token(TokenKind::COMMA),
-            "." => self.add_token(TokenKind::DOT),
-            "-" => self.add_token(TokenKind::MINUS),
-            "+" => self.add_token(TokenKind::PLUS),
-            ";" => self.add_token(TokenKind::SEMICOLON),
-            "*" => self.add_token(TokenKind::STAR),
+            "(" => self.add_token(TokenKind::LeftParen),
+            ")" => self.add_token(TokenKind::RightParen),
+            "{" => self.add_token(TokenKind::LeftBrace),
+            "}" => self.add_token(TokenKind::RightBrace),
+            "," => self.add_token(TokenKind::Comma),
+            "." => self.add_token(TokenKind::Dot),
+            "-" => self.add_token(TokenKind::Minus),
+            "+" => self.add_token(TokenKind::Plus),
+            ";" => self.add_token(TokenKind::Semicolon),
+            "*" => self.add_token(TokenKind::Star),
             "!" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::BANG_EQUAL);
+                    self.add_token(TokenKind::BangEqual);
                 } else {
-                    self.add_token(TokenKind::BANG);
+                    self.add_token(TokenKind::Bang);
                 };
             }
             "=" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::EQUAL_EQUAL);
+                    self.add_token(TokenKind::EqualEqual);
                 } else {
-                    self.add_token(TokenKind::EQUAL);
+                    self.add_token(TokenKind::Equal);
                 }
             }
             "<" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::LESS_EQUAL);
+                    self.add_token(TokenKind::LessEqual);
                 } else {
-                    self.add_token(TokenKind::LESS);
+                    self.add_token(TokenKind::Less);
                 }
             }
             ">" => {
                 if self.advance_if_next_matches("=") {
-                    self.add_token(TokenKind::GREATER_EQUAL);
+                    self.add_token(TokenKind::GreaterEqual);
                 } else {
-                    self.add_token(TokenKind::GREATER);
+                    self.add_token(TokenKind::Greater);
                 }
             }
             "/" => {
@@ -103,14 +104,14 @@ impl<'a> Scanner<'a> {
                     }
                 } else {
                     // Division
-                    self.add_token(TokenKind::SLASH);
+                    self.add_token(TokenKind::Slash);
                 }
             }
             "\"" => {
                 // Note: we're differing from the textbook by including the
                 // quotation marks. We could always trim them in `add_token`.
                 if self.advance_string() {
-                    self.add_token(TokenKind::STRING);
+                    self.add_token(TokenKind::String);
                 }
             }
             // Must precede whitespace check since newlines are also whitespace.
@@ -125,12 +126,12 @@ impl<'a> Scanner<'a> {
             // Lox just understands ASCII 0-9
             _ if is_digit(grapheme) => {
                 self.advance_number();
-                self.add_token(TokenKind::NUMBER);
+                self.add_token(TokenKind::Number);
             }
             _ if is_identifier_head(grapheme) => {
                 self.advance_identifier();
                 // TODO: check if identifier is keyword
-                self.add_token(TokenKind::IDENTIFIER);
+                self.add_token(TokenKind::Identifier);
             }
             _ => {
                 self.report_error(self.line_number, "Unexpected character.");
@@ -239,7 +240,11 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn add_token(&mut self, kind: TokenKind) {
+    fn add_token(&mut self, mut kind: TokenKind) {
+        let lexeme = &self.source[self.token_start_byte_offset..self.current_byte_offset];
+        if kind == TokenKind::Identifier {
+            kind = identifier_string_to_token_kind(lexeme);
+        }
         self.tokens.push(Token {
             kind,
             lexeme: &self.source[self.token_start_byte_offset..self.current_byte_offset],
@@ -266,53 +271,53 @@ impl<'a> std::fmt::Debug for Scanner<'a> {
 }
 
 // TODO: some lexemes have different types... Maybe we should refactor this.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TokenKind {
     // Single-character tokens.
-    LEFT_PAREN,
-    RIGHT_PAREN,
-    LEFT_BRACE,
-    RIGHT_BRACE,
-    COMMA,
-    DOT,
-    MINUS,
-    PLUS,
-    SEMICOLON,
-    SLASH,
-    STAR,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
 
     // One or two character tokens.
-    BANG,
-    BANG_EQUAL,
-    EQUAL,
-    EQUAL_EQUAL,
-    GREATER,
-    GREATER_EQUAL,
-    LESS,
-    LESS_EQUAL,
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
 
     // Literals.
-    IDENTIFIER,
-    STRING,
-    NUMBER,
+    Identifier,
+    String,
+    Number,
 
     // Keywords.
-    AND,
-    CLASS,
-    ELSE,
-    FALSE,
-    FUN,
-    FOR,
-    IF,
-    NIL,
-    OR,
-    PRINT,
-    RETURN,
-    SUPER,
-    THIS,
-    TRUE,
-    VAR,
-    WHILE,
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 
     EOF,
 }
@@ -366,4 +371,26 @@ fn is_identifier_head(grapheme: &str) -> bool {
 // it.
 fn is_identifier_tail(grapheme: &str) -> bool {
     grapheme.chars().all(|ch| char::is_alphanumeric(ch) || ch == '_')
+}
+
+fn identifier_string_to_token_kind(identifier: &str) -> TokenKind {
+    match identifier {
+        "and" => TokenKind::And,
+        "class" => TokenKind::Class,
+        "else" => TokenKind::Else,
+        "false" => TokenKind::False,
+        "for" => TokenKind::For,
+        "fun" => TokenKind::Fun,
+        "if" => TokenKind::If,
+        "nil" => TokenKind::Nil,
+        "or" => TokenKind::Or,
+        "print" => TokenKind::Print,
+        "return" => TokenKind::Return,
+        "super" => TokenKind::Super,
+        "this" => TokenKind::This,
+        "true" => TokenKind::True,
+        "var" => TokenKind::Var,
+        "while" => TokenKind::While,
+        _ => TokenKind::Identifier,
+    }
 }

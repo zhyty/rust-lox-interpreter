@@ -13,4 +13,6 @@ some _valid _identifiers123_
 
 123number_then_identifier
 
+var var_is_a_keyword and true;
+
 "Unterminated string
