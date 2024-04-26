@@ -37,16 +37,17 @@ impl expr::Visitor for RPNPrinter {
             // differently to distinguish it from a binary operation. We just
             // use the debug representation.
             Unary { operator, right } => {
-                format!("{} {:#?}", self.visit_expr(right), operator)
+                format!("{} {:#?}", self.visit_expr(right), operator.token)
             }
         }
     }
 }
 
 // TODO: AST printer should probably expose this
-fn token_to_string(token: &scanner::Token) -> String {
+
+fn token_to_string(annotated: &scanner::AnnotatedToken) -> String {
     use scanner::Token::*;
-    match token {
+    match annotated.token {
         LeftParen => "(".to_owned(),
         RightParen => ")".to_owned(),
         LeftBrace => "{".to_owned(),
@@ -97,26 +98,27 @@ fn token_to_string(token: &scanner::Token) -> String {
 fn main() -> anyhow::Result<()> {
     use expr::Expr::*;
     use scanner::Token::*;
+    use scanner::AnnotatedToken;
     // (-123) * (45.67)
     let test = Binary {
         left: Box::new(Unary {
-            operator: Minus,
+            operator: AnnotatedToken { token: Minus, line_number: 1 },
             right: Box::new(LiteralNumber(123.0)),
         }),
-        operator: Star,
+        operator: AnnotatedToken { token: Star, line_number: 1 },
         right: Box::new(Grouping(Box::new(LiteralNumber(45.67)))),
     };
     // (1 + 2) * (4 - 3)
     let test2 = Binary {
         left: Box::new(Binary {
             left: Box::new(LiteralNumber(1.0)),
-            operator: Plus,
+            operator: AnnotatedToken { token: Plus, line_number: 1 },
             right: Box::new(LiteralNumber(2.0)),
         }),
-        operator: Star,
+        operator: AnnotatedToken { token: Star, line_number: 1 },
         right: Box::new(Binary {
             left: Box::new(LiteralNumber(4.0)),
-            operator: Minus,
+            operator: AnnotatedToken { token: Minus, line_number: 1 },
             right: Box::new(LiteralNumber(3.0)),
         }),
     };

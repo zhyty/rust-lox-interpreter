@@ -39,9 +39,9 @@ impl expr::Visitor for AstPrinter {
     }
 }
 
-fn token_to_string(token: &scanner::Token) -> String {
+fn token_to_string(annotated: &scanner::AnnotatedToken) -> String {
     use scanner::Token::*;
-    match token {
+    match annotated.token {
         LeftParen => "(".to_owned(),
         RightParen => ")".to_owned(),
         LeftBrace => "{".to_owned(),
@@ -92,12 +92,13 @@ fn token_to_string(token: &scanner::Token) -> String {
 fn main() -> anyhow::Result<()> {
     use expr::Expr::*;
     use scanner::Token::*;
+    use scanner::AnnotatedToken;
     let test = Binary {
         left: Box::new(Unary {
-            operator: Minus,
+            operator: AnnotatedToken { token: Minus, line_number: 1 },
             right: Box::new(LiteralNumber(123.0)),
         }),
-        operator: Star,
+        operator: AnnotatedToken { token: Star, line_number: 1 },
         right: Box::new(Grouping(Box::new(LiteralNumber(45.67)))),
     };
     println!("{}", AstPrinter.visit_expr(&test));

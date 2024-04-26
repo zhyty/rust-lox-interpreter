@@ -9,14 +9,14 @@ pub trait Visitor {
 pub enum Expr<'a> {
     Binary {
         left: Box<Expr<'a>>,
-        operator: scanner::Token<'a>,
+        operator: scanner::AnnotatedToken<'a>,
         right: Box<Expr<'a>>,
     },
     Grouping(Box<Expr<'a>>),
     LiteralNumber(f64),
     LiteralString(&'a str),
     Unary {
-        operator: scanner::Token<'a>,
+        operator: scanner::AnnotatedToken<'a>,
         right: Box<Expr<'a>>,
     },
 }
