@@ -1,5 +1,4 @@
 use first_interpreter::expr;
-use first_interpreter::expr::Acceptor;
 use first_interpreter::expr::Visitor;
 use first_interpreter::scanner;
 
@@ -20,12 +19,12 @@ impl expr::Visitor for AstPrinter {
                 format!(
                     "({} {} {})",
                     token_to_string(operator),
-                    left.accept(self),
-                    right.accept(self)
+                    self.visit_expr(left),
+                    self.visit_expr(right)
                 )
             }
             Grouping(expr) => {
-                format!("({})", expr.accept(self))
+                format!("({})", self.visit_expr(expr))
             }
             LiteralNumber(number) => {
                 format!("{}", number)
@@ -34,7 +33,7 @@ impl expr::Visitor for AstPrinter {
                 format!("{}", ss)
             }
             Unary { operator, right } => {
-                format!("({} {})", token_to_string(operator), right.accept(self))
+                format!("({} {})", token_to_string(operator), self.visit_expr(right))
             }
         }
     }
