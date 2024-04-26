@@ -6,9 +6,7 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::scanner::Scanner;
-
-mod scanner;
+use first_interpreter::scanner::Scanner;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
