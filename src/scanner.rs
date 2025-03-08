@@ -294,7 +294,7 @@ impl<'a> std::fmt::Debug for Scanner<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     // Single-character tokens.
     LeftParen,
@@ -345,7 +345,7 @@ pub enum Token<'a> {
     EOF,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AnnotatedToken<'a> {
     pub token: Token<'a>,
     pub line_number: usize,
