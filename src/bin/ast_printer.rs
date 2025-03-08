@@ -26,14 +26,20 @@ impl expr::Visitor for AstPrinter {
             Grouping(expr) => {
                 format!("({})", self.visit_expr(expr))
             }
+            Unary { operator, right } => {
+                format!("({} {})", token_to_string(operator), self.visit_expr(right))
+            },
             LiteralNumber(number) => {
                 format!("{}", number)
             }
             LiteralString(ss) => {
                 format!("{}", ss)
             }
-            Unary { operator, right } => {
-                format!("({} {})", token_to_string(operator), self.visit_expr(right))
+            LiteralBool(bb) => {
+                format!("{}", bb)
+            }
+            Nil => {
+                "nil".to_owned()
             }
         }
     }
