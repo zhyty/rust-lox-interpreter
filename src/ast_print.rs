@@ -6,7 +6,6 @@ pub struct AstPrinter;
 impl expr::Visitor for AstPrinter {
     type Result = String;
 
-    // TODO: non-debug string representation of operator token?
     fn visit_expr(&mut self, expr: &expr::Expr) -> Self::Result {
         use expr::Expr::*;
         match expr {
@@ -44,7 +43,7 @@ impl expr::Visitor for AstPrinter {
     }
 }
 
-fn token_to_string(annotated: &scanner::AnnotatedToken) -> String {
+pub fn token_to_string(annotated: &scanner::AnnotatedToken) -> String {
     use scanner::Token::*;
     match annotated.token {
         LeftParen => "(".to_owned(),
