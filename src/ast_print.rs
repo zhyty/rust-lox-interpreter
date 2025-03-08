@@ -1,10 +1,9 @@
 use crate::expr;
-use crate::expr::Visitor;
 use crate::scanner;
 
 pub struct AstPrinter;
 
-pub impl expr::Visitor for AstPrinter {
+impl expr::Visitor for AstPrinter {
     type Result = String;
 
     // TODO: non-debug string representation of operator token?

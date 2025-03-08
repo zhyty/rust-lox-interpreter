@@ -1,4 +1,5 @@
 use first_interpreter::ast_print;
+use first_interpreter::expr::Visitor;
 
 fn main() -> anyhow::Result<()> {
     use first_interpreter::expr::Expr::*;
