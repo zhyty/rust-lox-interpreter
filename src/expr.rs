@@ -6,6 +6,7 @@ pub trait Visitor {
     fn visit_expr(&mut self, expr: &Expr) -> Self::Result;
 }
 
+// TODO: maybe expr should take tokens as reference? It would avoid cloning
 pub enum Expr<'a> {
     Binary {
         left: Box<Expr<'a>>,

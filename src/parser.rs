@@ -1,6 +1,7 @@
 use crate::expr;
 use crate::scanner::AnnotatedToken;
 use crate::scanner::Token;
+use expr::Expr;
 
 pub struct Parser<'a> {
     // TODO: actually this would probably be some iterator of tokens.
@@ -62,8 +63,17 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        // TODO
-        self.primary()
+        let annotated_token = self.peek().clone();
+        match annotated_token.token {
+            Token::Plus | Token::Minus => {
+                self.advance();
+                return Ok(Box::new(Expr::Unary {
+                    operator: annotated_token,
+                    right: self.unary()?,
+                }));
+            }
+            _ => return self.primary(),
+        }
     }
 
     fn primary(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
@@ -101,14 +111,6 @@ impl<'a> Parser<'a> {
         pred(&self.peek().token)
     }
 
-    fn advance_if_matches(&mut self, pred: fn(&Token) -> bool) -> bool {
-        let matches = self.matches(pred);
-        if matches {
-            self.advance();
-        }
-        matches
-    }
-
     fn peek(&self) -> &AnnotatedToken<'a> {
         &self.tokens[self.current_index]
     }
@@ -126,12 +128,32 @@ mod tests {
     use crate::scanner;
 
     #[test]
-    fn basic_scan() {
+    fn basic_equality() {
         let source = "1 == 2;";
         let mut scanner = scanner::Scanner::new(source);
         let tokens = scanner.scan_tokens();
         let mut parser = Parser::new(tokens);
         let expr = parser.parse().unwrap();
         assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== 1 2)");
+    }
+
+    #[test]
+    fn multiple_equality() {
+        let source = "1 == 2 != 3;";
+        let mut scanner = scanner::Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(!= (== 1 2) 3)");
+    }
+
+    #[test]
+    fn unary_equality() {
+        let source = "+1 == -1;";
+        let mut scanner = scanner::Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== (+ 1) (- 1))");
     }
 }
