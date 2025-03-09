@@ -28,6 +28,7 @@ impl<'a> Parser<'a> {
         self.equality()
     }
 
+    // comparison ( ( "!=" | "==" ) comparison )*
     fn equality(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
         let mut expr = self.comparison()?;
         loop {
@@ -47,31 +48,58 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    // term ( ( ">" | ">=" | "<" | "<=" ) term )*
+    // NOTE: left-associative
     fn comparison(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
         // TODO
         self.term()
     }
 
+    // factor ( ( "-" | "+" ) factor )*
+    // NOTE: left-associative
     fn term(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        // TODO
-        self.factor()
-    }
-
-    fn factor(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        let left_expr = self.unary()?;
-        let possible_operator = self.peek().clone();
-        match possible_operator.token {
-            // Multiplication or division
-            Token::Slash | Token::Star => {
-                self.advance();
-                Ok(Box::new(Expr::Binary { left: left_expr, operator: possible_operator, right: self.factor()?}))
-            }
-            _ => {
-                Ok(left_expr)
+        let mut expr = self.factor()?;
+        loop {
+            let possible_operator = self.peek().clone();
+            match possible_operator.token {
+                // Addition or subtraction
+                Token::Minus | Token::Plus => {
+                    self.advance();
+                    let next_factor = self.factor()?;
+                    expr = Box::new(Expr::Binary {
+                        left: expr, // left associative
+                        operator: possible_operator,
+                        right: next_factor,
+                    });
+                }
+                _ => return Ok(expr),
             }
         }
     }
 
+    // unary ( ( "/" | "*" ) unary )*
+    // LEFT-associative
+    fn factor(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
+        let mut expr = self.unary()?;
+        loop {
+            let possible_operator = self.peek().clone();
+            match possible_operator.token {
+                // Multiplication or division
+                Token::Slash | Token::Star => {
+                    self.advance();
+                    let next_unary = self.unary()?;
+                    expr = Box::new(Expr::Binary {
+                        left: expr,
+                        operator: possible_operator,
+                        right: next_unary,
+                    });
+                }
+                _ => return Ok(expr),
+            }
+        }
+    }
+
+    // NOTE: RIGHT associative
     fn unary(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
         let annotated_token = self.peek().clone();
         match annotated_token.token {
@@ -137,6 +165,7 @@ mod tests {
     use crate::expr::Visitor;
     use crate::scanner;
 
+    // TODO: refactor test
     #[test]
     fn basic_equality() {
         let source = "1 == 2;";
@@ -174,6 +203,38 @@ mod tests {
         let tokens = scanner.scan_tokens();
         let mut parser = Parser::new(tokens);
         let expr = parser.parse().unwrap();
-        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== (* (+ 1) (- 2)) (/ (- 1) 4))");
+        assert_eq!(
+            ast_print::AstPrinter.visit_expr(&expr),
+            "(== (* (+ 1) (- 2)) (/ (- 1) 4))"
+        );
+    }
+
+    #[test]
+    fn nested_unary() {
+        let source = "-+-+1";
+        let mut scanner = scanner::Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+        // Right-associative
+        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(- (+ (- (+ 1))))");
+    }
+
+    #[test]
+    fn bedmas_priority_left_associativity() {
+        let source = "+1 * -2 + +3 - 4;";
+        let mut scanner = scanner::Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+        assert_eq!(
+            ast_print::AstPrinter.visit_expr(&expr),
+            "(- (+ (* (+ 1) (- 2)) (+ 3)) 4)"
+        );
+    }
+
+    #[test]
+    fn bracket_primary() {
+        // TODO
     }
 }
