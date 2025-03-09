@@ -165,76 +165,46 @@ mod tests {
     use crate::expr::Visitor;
     use crate::scanner;
 
-    // TODO: refactor test
-    #[test]
-    fn basic_equality() {
-        let source = "1 == 2;";
+    fn test_with_ast(source: &'static str, expected_ast: &'static str) {
         let mut scanner = scanner::Scanner::new(source);
         let tokens = scanner.scan_tokens();
         let mut parser = Parser::new(tokens);
         let expr = parser.parse().unwrap();
-        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== 1 2)");
+        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), expected_ast);
+    }
+
+    #[test]
+    fn basic_equality() {
+        test_with_ast("1 == 2;", "(== 1 2)");
     }
 
     #[test]
     fn multiple_equality() {
-        let source = "1 == 2 != 3;";
-        let mut scanner = scanner::Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
-        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(!= (== 1 2) 3)");
+        test_with_ast("1 == 2 != 3;", "(!= (== 1 2) 3)");
     }
 
     #[test]
     fn unary_equality() {
-        let source = "+1 == -1;";
-        let mut scanner = scanner::Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
-        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== (+ 1) (- 1))");
+        test_with_ast("+1 == -1;", "(== (+ 1) (- 1))");
     }
 
     #[test]
     fn unary_factor_equality() {
-        let source = "+1 * -2 == -1 / 4;";
-        let mut scanner = scanner::Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
-        assert_eq!(
-            ast_print::AstPrinter.visit_expr(&expr),
-            "(== (* (+ 1) (- 2)) (/ (- 1) 4))"
-        );
+        test_with_ast("+1 * -2 == -1 / 4;", "(== (* (+ 1) (- 2)) (/ (- 1) 4))");
     }
 
     #[test]
     fn nested_unary() {
-        let source = "-+-+1";
-        let mut scanner = scanner::Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
-        // Right-associative
-        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(- (+ (- (+ 1))))");
+        test_with_ast("-+-+1", "(- (+ (- (+ 1))))");
     }
 
     #[test]
     fn bedmas_priority_left_associativity() {
-        let source = "+1 * -2 + +3 - 4;";
-        let mut scanner = scanner::Scanner::new(source);
-        let tokens = scanner.scan_tokens();
-        let mut parser = Parser::new(tokens);
-        let expr = parser.parse().unwrap();
-        assert_eq!(
-            ast_print::AstPrinter.visit_expr(&expr),
-            "(- (+ (* (+ 1) (- 2)) (+ 3)) 4)"
-        );
+        test_with_ast("+1 * -2 + +3 - 4;", "(- (+ (* (+ 1) (- 2)) (+ 3)) 4)");
     }
 
     #[test]
     fn bracket_primary() {
-        // TODO
+        test_with_ast("(12 + 23) * (3 - 4)", "(* ((+ 12 23)) ((- 3 4)))")
     }
 }
