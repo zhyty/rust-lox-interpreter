@@ -58,8 +58,18 @@ impl<'a> Parser<'a> {
     }
 
     fn factor(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        // TODO
-        self.unary()
+        let left_expr = self.unary()?;
+        let possible_operator = self.peek().clone();
+        match possible_operator.token {
+            // Multiplication or division
+            Token::Slash | Token::Star => {
+                self.advance();
+                Ok(Box::new(Expr::Binary { left: left_expr, operator: possible_operator, right: self.factor()?}))
+            }
+            _ => {
+                Ok(left_expr)
+            }
+        }
     }
 
     fn unary(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
@@ -155,5 +165,15 @@ mod tests {
         let mut parser = Parser::new(tokens);
         let expr = parser.parse().unwrap();
         assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== (+ 1) (- 1))");
+    }
+
+    #[test]
+    fn unary_factor_equality() {
+        let source = "+1 * -2 == -1 / 4;";
+        let mut scanner = scanner::Scanner::new(source);
+        let tokens = scanner.scan_tokens();
+        let mut parser = Parser::new(tokens);
+        let expr = parser.parse().unwrap();
+        assert_eq!(ast_print::AstPrinter.visit_expr(&expr), "(== (* (+ 1) (- 2)) (/ (- 1) 4))");
     }
 }
