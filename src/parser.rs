@@ -30,73 +30,36 @@ impl<'a> Parser<'a> {
 
     // comparison ( ( "!=" | "==" ) comparison )*
     fn equality(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        let mut expr = self.comparison()?;
-        loop {
-            let annotated_token = self.peek().clone();
-            match annotated_token.token {
-                Token::BangEqual | Token::EqualEqual => {
-                    self.advance();
-                    expr = Box::new(expr::Expr::Binary {
-                        left: expr,
-                        operator: annotated_token,
-                        right: self.comparison()?,
-                    });
-                }
-                _ => break,
-            }
-        }
-        Ok(expr)
+        self.subrule_operator_subrule_left_associative_helper(Self::comparison, |token| {
+            matches!(token, Token::BangEqual | Token::EqualEqual)
+        })
     }
 
     // term ( ( ">" | ">=" | "<" | "<=" ) term )*
     // NOTE: left-associative
     fn comparison(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        // TODO
-        self.term()
+        self.subrule_operator_subrule_left_associative_helper(Self::term, |token| {
+            matches!(
+                token,
+                Token::Greater | Token::GreaterEqual | Token::Less | Token::LessEqual
+            )
+        })
     }
 
     // factor ( ( "-" | "+" ) factor )*
     // NOTE: left-associative
     fn term(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        let mut expr = self.factor()?;
-        loop {
-            let possible_operator = self.peek().clone();
-            match possible_operator.token {
-                // Addition or subtraction
-                Token::Minus | Token::Plus => {
-                    self.advance();
-                    let next_factor = self.factor()?;
-                    expr = Box::new(Expr::Binary {
-                        left: expr, // left associative
-                        operator: possible_operator,
-                        right: next_factor,
-                    });
-                }
-                _ => return Ok(expr),
-            }
-        }
+        self.subrule_operator_subrule_left_associative_helper(Self::factor, |token| {
+            matches!(token, Token::Minus | Token::Plus)
+        })
     }
 
     // unary ( ( "/" | "*" ) unary )*
     // LEFT-associative
     fn factor(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        let mut expr = self.unary()?;
-        loop {
-            let possible_operator = self.peek().clone();
-            match possible_operator.token {
-                // Multiplication or division
-                Token::Slash | Token::Star => {
-                    self.advance();
-                    let next_unary = self.unary()?;
-                    expr = Box::new(Expr::Binary {
-                        left: expr,
-                        operator: possible_operator,
-                        right: next_unary,
-                    });
-                }
-                _ => return Ok(expr),
-            }
-        }
+        self.subrule_operator_subrule_left_associative_helper(Self::unary, |token| {
+            matches!(token, Token::Slash | Token::Star)
+        })
     }
 
     // NOTE: RIGHT associative
@@ -115,9 +78,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> anyhow::Result<Box<expr::Expr<'a>>> {
-        let token = &self.peek().token;
-
-        let expr = match token {
+        let expr = match &self.peek().token {
             Token::False => Box::new(expr::Expr::LiteralBool(false)),
             Token::True => Box::new(expr::Expr::LiteralBool(true)),
             Token::Nil => Box::new(expr::Expr::Nil),
@@ -151,6 +112,28 @@ impl<'a> Parser<'a> {
 
     fn peek(&self) -> &AnnotatedToken<'a> {
         &self.tokens[self.current_index]
+    }
+
+    fn subrule_operator_subrule_left_associative_helper(
+        &mut self,
+        parse_subrule_fn: fn(&mut Self) -> anyhow::Result<Box<expr::Expr<'a>>>,
+        operator_pred: fn(&Token) -> bool,
+    ) -> anyhow::Result<Box<expr::Expr<'a>>> {
+        let mut left_expr = parse_subrule_fn(self)?;
+        loop {
+            let possible_operator = self.peek().clone();
+            if operator_pred(&possible_operator.token) {
+                self.advance();
+                let right_expr = parse_subrule_fn(self)?;
+                left_expr = Box::new(Expr::Binary {
+                    left: left_expr,
+                    operator: possible_operator,
+                    right: right_expr,
+                });
+            } else {
+                return Ok(left_expr);
+            }
+        }
     }
 
     fn at_end(&self) -> bool {
@@ -206,5 +189,10 @@ mod tests {
     #[test]
     fn bracket_primary() {
         test_with_ast("(12 + 23) * (3 - 4)", "(* ((+ 12 23)) ((- 3 4)))")
+    }
+
+    #[test]
+    fn strings() {
+        test_with_ast("\"str\" + \"otherstr\"", "(+ \"str\" \"otherstr\")")
     }
 }
